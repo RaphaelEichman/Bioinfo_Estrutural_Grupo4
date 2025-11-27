@@ -4,7 +4,6 @@ import os
 import sys
 import config 
 
-# Importa os módulos de funções
 from pipeline_utils import filter_utils
 from pipeline_utils import extract_utils
 from pipeline_utils import blast_utils
@@ -160,13 +159,11 @@ def main():
             target_dir = dir_f3
 
             if escolha_fonte in ['1', '2']:
-                # Modo Manual para pastas raiz (Pergunta 1 não existe, Pergunta 2 acontece)
                 source_dir = dir_f1 if escolha_fonte == '1' else dir_f2a
                 print(f"Lendo FASTAs de: {source_dir}")
                 blast_utils.rodar_blast(source_dir, target_dir, automatico=False)
 
             elif escolha_fonte == '3':
-                # Modo Automático para subpastas (Pergunta 1 acontece, Pergunta 2 suprimida)
                 print(f"\nAnalisando subpastas em '{dir_f2b}'...")
                 try:
                     subpastas = [d for d in os.listdir(dir_f2b) if os.path.isdir(os.path.join(dir_f2b, d))]
@@ -188,7 +185,6 @@ def main():
                 except Exception as e: print(f"Erro: {e}")
 
             elif escolha_fonte == '4':
-                # Modo Automático para subpastas (Pergunta 1 acontece, Pergunta 2 suprimida)
                 print(f"\nAnalisando subpastas em '{dir_f5}'...")
                 try:
                     subpastas = [d for d in os.listdir(dir_f5) if os.path.isdir(os.path.join(dir_f5, d))]
@@ -204,7 +200,6 @@ def main():
                         pastas_proc.append(subpastas[int(escolha)-1])
                     for p in pastas_proc:
                         s_dir = os.path.join(dir_f5, p)
-                        # Padronização: nome da pasta de saída = nome da pasta de entrada (sem prefixo Consenso_)
                         t_dir = os.path.join(target_dir, p) 
                         os.makedirs(t_dir, exist_ok=True)
                         blast_utils.rodar_blast(s_dir, t_dir, automatico=True)
@@ -240,7 +235,6 @@ def main():
         # --- OPÇÃO 7: MODELLER ---
         elif opcao == '7':
             print(f"\n--- Iniciando Função 7: Rodar MODELLER ---")
-            # Adicionado dir_f5 na chamada para garantir a busca de consenso
             modeller_utils.run_modelling(dir_f2a, dir_f2b, dir_f5, dir_f6, dir_f7)
             
         else:

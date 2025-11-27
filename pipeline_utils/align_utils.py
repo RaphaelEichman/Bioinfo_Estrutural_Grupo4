@@ -83,13 +83,12 @@ def alinhar_dominios_clustalo_online(dir_leitura_fasta, dir_escrita_align):
                 print("Erro no job. Pulando arquivo.")
                 continue
 
-            # Organização de Pastas
             nome_base = os.path.splitext(arquivo_fasta)[0]
             pasta_saida_especifica = os.path.join(dir_escrita_align, nome_base)
             os.makedirs(pasta_saida_especifica, exist_ok=True)
             print(f"Salvando resultados em: {pasta_saida_especifica}")
 
-            # Baixar e Salvar Alinhamento
+            # Baixar Alinhamento
             url_result = f"https://www.ebi.ac.uk/Tools/services/rest/clustalo/result/{job_id}/aln-clustal"
             result_resp = requests.get(url_result)
             result_resp.raise_for_status()
@@ -103,7 +102,7 @@ def alinhar_dominios_clustalo_online(dir_leitura_fasta, dir_escrita_align):
             alignment = AlignIO.read(StringIO(aln_text), "clustal")
             print(f"✓ {len(alignment)} sequências alinhadas ({alignment.get_alignment_length()} posições)")
 
-            # Baixar e Salvar Árvore
+            # Baixar Árvore
             print("Baixando Phylogenetic Tree...")
             url_tree = f"https://www.ebi.ac.uk/Tools/services/rest/clustalo/result/{job_id}/tree"
             r = requests.get(url_tree)

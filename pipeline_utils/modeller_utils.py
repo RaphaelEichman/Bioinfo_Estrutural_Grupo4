@@ -1,4 +1,3 @@
-# pipeline_utils/modeller_utils.py
 """
 Módulo para a Função 7 (Modeller): Rodar o MODELLER.
 (Versão Atualizada: Busca robusta por arquivos em F5/F2 ignorando sufixos)
@@ -15,7 +14,6 @@ import contextlib
 import json 
 import re 
 
-# Importações do MODELLER
 try:
     from modeller import *
     from modeller.automodel import *
@@ -24,50 +22,37 @@ except ImportError:
     
 import sys 
 
-# --- CLASSE PERSONALIZADA DO AUTOMODEL ---
 class MyAutoModel(AutoModel):
     def user_after_single_model(self):
         sys.__stdout__.write(f"    -> Modelo gerado com sucesso.\n")
         sys.__stdout__.flush()
 
-# --- HELPER: Encontrar a sequência alvo (Busca Inteligente) ---
 def find_target_sequence(query_key, dir_f2b, dir_f2a, dir_f5=None):
     """
     Encontra um SeqRecord correspondente ao 'query_key'.
     Tenta casar o nome exato OU verifica se o query_key é parte do nome do arquivo.
     """
     
-    # 1. Busca em Funcao5_Consensus (Prioridade para Consenso)
+    # 1. Busca em Funcao5_Consensus
     if dir_f5 and os.path.exists(dir_f5):
-        # Tenta achar uma PASTA que contenha o nome (Blast cria pastas com nome base)
-        # Ex: query_key = "Diguanylate_cyclase"
-        # Pasta pode ser: "Diguanylate_cyclase,_GGDEF_domain_Pfam"
-        
-        # Estratégia A: Busca Exata ou Parcial na estrutura de pastas
         pastas_candidatas = []
         for root, dirs, files in os.walk(dir_f5):
-            # Se a pasta atual é a raiz F5, olhamos as subpastas
             if root == dir_f5:
                 for d in dirs:
-                    if query_key in d: # Se o nome do blast está contido no nome da pasta consenso
+                    if query_key in d:
                         pastas_candidatas.append(os.path.join(root, d))
             
-            # Estratégia B: Busca por ARQUIVOS FASTA
             for file in files:
                 if file.endswith(".fasta"):
-                    # Verifica se query_key está dentro do nome do arquivo
-                    # Ex: query_key "Diguanylate" está em "Diguanylate_..._consensus.fasta"
                     if query_key in file:
                         try:
                             return SeqIO.read(os.path.join(root, file), "fasta")
                         except Exception: 
-                            # Se não der pra ler direto, tenta parse
                             try:
                                 for record in SeqIO.parse(os.path.join(root, file), "fasta"):
                                     return record
                             except: pass
 
-        # Se achou pastas candidatas na Estratégia A, pega o primeiro fasta de lá
         for pasta in pastas_candidatas:
             arquivos = [f for f in os.listdir(pasta) if f.endswith(".fasta")]
             if arquivos:
@@ -92,14 +77,12 @@ def find_target_sequence(query_key, dir_f2b, dir_f2a, dir_f5=None):
                     try:
                         for record in SeqIO.parse(os.path.join(dir_f2a, file), "fasta"):
                             if query_key in record.id: return record
-                            # Se não bater ID, retorna o primeiro (assumindo ser o certo pelo nome do arquivo)
                             return record
                     except Exception: pass
         except Exception: pass
 
     return None
 
-# --- HELPER: Escrever o arquivo .ali ---
 def write_sequence_to_ali(seq_record, ali_file_path, target_code="MtDH"):
     try:
         with open(ali_file_path, 'w') as f:
@@ -112,7 +95,6 @@ def write_sequence_to_ali(seq_record, ali_file_path, target_code="MtDH"):
         print(f"[ERRO] Falha ao criar arquivo .ali: {e}")
         return False
 
-# --- HELPER: Extrair Resolução do PDB ---
 def get_pdb_resolution(pdb_path):
     try:
         with open(pdb_path, 'r') as f:
@@ -129,7 +111,6 @@ def get_pdb_resolution(pdb_path):
         return "Erro"
     return "N/A" 
 
-# --- HELPER: Seleção Interativa de Molde ---
 def selecionar_molde_interativo(run_dir):
     json_path = os.path.join(run_dir, "blast_hits.json")
     pasta_moldes = os.path.join(run_dir, "Moldes")
@@ -199,8 +180,6 @@ def selecionar_molde_interativo(run_dir):
         else:
             print("  Opção inválida. Digite 1 ou 2.")
 
-
-# --- FUNÇÃO CORE DO MODELLER ---
 def _execute_modeller_core(run_dir, selected_code, selected_chain):
     print(f"\n--- Iniciando Core do Modeller com {selected_code}:{selected_chain} ---")
     try:
@@ -243,8 +222,6 @@ def _execute_modeller_core(run_dir, selected_code, selected_chain):
         print(f"\n[ERRO NO CORE] {e}")
         raise e
 
-
-# --- FUNÇÃO PRINCIPAL (ORQUESTRADOR) ---
 def run_modelling(dir_f2a, dir_f2b, dir_f5, dir_f6, dir_f7):
     """
     Orquestra o processo de modelagem.
@@ -253,7 +230,6 @@ def run_modelling(dir_f2a, dir_f2b, dir_f5, dir_f6, dir_f7):
     """
     print("\n--- Iniciando Função 7: MODELLER ---")
     
-    # 1. Selecionar Fonte (F6)
     try:
         pastas_base = [d for d in os.listdir(dir_f6) if os.path.isdir(os.path.join(dir_f6, d))]
     except Exception as e:
@@ -332,7 +308,6 @@ def run_modelling(dir_f2a, dir_f2b, dir_f5, dir_f6, dir_f7):
         print(f"PROCESSANDO: {query_key}")
         print(f"==================================================")
         
-        # 2. Encontrar Alvo (AGORA INCLUI F5 com busca inteligente)
         target_seq_record = find_target_sequence(query_key, dir_f2b, dir_f2a, dir_f5)
         if target_seq_record is None:
             print(f"[ERRO] Alvo não encontrado em F2b, F5 ou F2a para '{query_key}'. Pulando.")
@@ -340,7 +315,6 @@ def run_modelling(dir_f2a, dir_f2b, dir_f5, dir_f6, dir_f7):
         
         print(f"  -> Alvo encontrado: {target_seq_record.id}")
 
-        # 3. Preparar Estrutura de Pastas
         f7_run_base_dir = os.path.join(dir_f7, nome_pasta_base)
         os.makedirs(f7_run_base_dir, exist_ok=True)
         
@@ -350,7 +324,6 @@ def run_modelling(dir_f2a, dir_f2b, dir_f5, dir_f6, dir_f7):
         template_dest_path = os.path.join(run_dir, "Moldes")
         os.makedirs(template_dest_path, exist_ok=True)
         
-        # Copiar JSON e PDBs
         json_source_path = os.path.join(template_source_path, "blast_hits.json")
         json_dest_path = os.path.join(run_dir, "blast_hits.json")
         
@@ -368,19 +341,16 @@ def run_modelling(dir_f2a, dir_f2b, dir_f5, dir_f6, dir_f7):
             print(f"  [ERRO] Falha ao copiar arquivos: {e}. Pulando.")
             continue
         
-        # Criar .ali
         ali_file_path = os.path.join(run_dir, "MtDH.ali")
         if not write_sequence_to_ali(target_seq_record, ali_file_path, "MtDH"):
             continue
 
-        # 4. Seleção de Molde
         selected_code, selected_chain = selecionar_molde_interativo(run_dir)
         
         if not selected_code:
             print("  [Abortado] Nenhum molde selecionado. Pulando esta proteína.")
             continue
 
-        # 5. Execução do MODELLER (Silenciada)
         log_file_path = os.path.join(run_dir, "saida.log")
         print(f"  Iniciando MODELLER... (Aguarde, log em: {os.path.basename(log_file_path)})")
         
@@ -397,14 +367,12 @@ def run_modelling(dir_f2a, dir_f2b, dir_f5, dir_f6, dir_f7):
             os.chdir(original_cwd) 
             continue
         
-        # 6. Pós-Processamento
         os.chdir(run_dir) 
         
         print("\n  --- Processando Melhores Resultados ---")
         dir_selecionados = os.path.join(run_dir, "Selecionados")
         os.makedirs(dir_selecionados, exist_ok=True)
         
-        # Copiar Molde Selecionado
         caminho_molde_origem = os.path.join("Moldes", f"{selected_code}.pdb")
         caminho_molde_destino = os.path.join(dir_selecionados, f"Molde_{selected_code}.pdb")
         
@@ -414,7 +382,6 @@ def run_modelling(dir_f2a, dir_f2b, dir_f5, dir_f6, dir_f7):
         else:
             print(f"  -> [Aviso] Molde {selected_code}.pdb não encontrado para cópia.")
 
-        # Copiar Melhor Modelo
         try:
             output_folder = "output"
             if modeller_outputs:

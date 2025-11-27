@@ -19,13 +19,11 @@ def rodar_blast(dir_leitura_fasta, dir_escrita_blast, automatico=False):
             print(f"\n[Atenção] Nenhum arquivo .fasta encontrado em '{dir_leitura_fasta}'.")
             return
 
-        # LÓGICA DE SELEÇÃO (Pergunta 2)
+        # Seleção de Arquivos
         if automatico:
-            # Pula a pergunta e seleciona tudo
             print(f"-> Processando automaticamente {len(fasta_files)} arquivo(s) em '{os.path.basename(dir_leitura_fasta)}'...")
             arquivos_escolhidos = fasta_files
         else:
-            # Modo manual (Faz a pergunta 2)
             print(f"\nArquivos .fasta encontrados em '{os.path.basename(dir_leitura_fasta)}':")
             for f in fasta_files:
                 print(f"  - {f}")
@@ -55,7 +53,6 @@ def rodar_blast(dir_leitura_fasta, dir_escrita_blast, automatico=False):
             entrada = os.path.join(dir_leitura_fasta, fasta)
             saida = os.path.join(dir_escrita_blast, f"{fasta}_blast.tsv")
 
-            # Verifica se já existe para não refazer (opcional, mas útil)
             if os.path.exists(saida) and os.path.getsize(saida) > 0:
                 print(f"  -> {fasta} já processado. Pulando.")
                 continue

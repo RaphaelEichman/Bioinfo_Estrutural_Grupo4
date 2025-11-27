@@ -1,4 +1,3 @@
-# pipeline_utils/consensus_utils.py
 """
 Módulo para a Função 4: Gerar sequências consenso de alinhamentos.
 """
@@ -8,10 +7,6 @@ from collections import Counter
 import random
 import os
 
-# ---------------------------------------------------------------
-# Dicionário de classes de aminoácidos
-# (Sem alterações)
-# ---------------------------------------------------------------
 residue_classes = {
     "A": "hidrofóbico", "V": "hidrofóbico", "L": "hidrofóbico", "I": "hidrofóbico", "M": "hidrofóbico",
     "F": "aromático", "Y": "aromático", "W": "aromático",
@@ -21,9 +16,6 @@ residue_classes = {
     "C": "especial (enxofre)", "G": "especial (flexível)", "P": "especial (cíclico)"
 }
 
-# ---------------------------------------------------------------
-# Função para processar um único arquivo
-# ---------------------------------------------------------------
 def gerar_consenso_e_relatorio(arquivo_alinhamento, formato="clustal", limite_gaps=0.7, pasta_saida="consensus_results"):
     """
     Processa um único arquivo de alinhamento e salva seu consenso
@@ -80,14 +72,10 @@ def gerar_consenso_e_relatorio(arquivo_alinhamento, formato="clustal", limite_ga
     fasta_saida = os.path.join(pasta_saida, f"{nome_base}_consensus.fasta")
     relatorio_saida = os.path.join(pasta_saida, f"{nome_base}_report.tsv")
     
-    # --- CORREÇÃO DE PADRONIZAÇÃO AQUI ---
-    # Antes: f.write(f">Consensus_{nome_base}\n")
-    # Agora: Mantemos coerência com o nome do arquivo
     with open(fasta_saida, "w") as f:
         f.write(f">{nome_base}_consensus\n")
         for i in range(0, len(consenso_seq), 60):
             f.write(consenso_seq[i:i+60] + "\n")
-    # -------------------------------------
     
     with open(relatorio_saida, "w") as f:
         f.write("Posição\tResíduo_Consenso\tFrequência_Consenso(%)\tNº_Sequências\tClasse_Residuo\tAlerta\n")
@@ -98,9 +86,6 @@ def gerar_consenso_e_relatorio(arquivo_alinhamento, formato="clustal", limite_ga
     
     return f"{nome_base}_consensus", consenso_seq
 
-# ---------------------------------------------------------------
-# Função principal
-# ---------------------------------------------------------------
 def gerar_consensos_para_diretorio(dir_leitura_align, dir_escrita_consensus, limite_gaps=0.7):
     """
     Busca (recursivamente) por arquivos de alinhamento em 'Funcao4_AlinhamentoMultiplo',
@@ -154,7 +139,6 @@ def gerar_consensos_para_diretorio(dir_leitura_align, dir_escrita_consensus, lim
         except Exception as e:
             print(f"Erro ao processar {arquivo_base}: {e}")
 
-    # --- Salva o arquivo 'todas_consensus.fasta' ---
     if todas_consensos:
         fasta_geral = os.path.join(pasta_saida_raiz, "todas_consensus.fasta")
         with open(fasta_geral, "w") as f:

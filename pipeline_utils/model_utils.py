@@ -19,7 +19,6 @@ def enviar_para_modelagem(dir_leitura_fasta, dir_escrita_model):
 
         print(f"Encontrados {len(fasta_files)} arquivos .fasta para processar.")
 
-        # A pasta de modelagem é a própria pasta de escrita
         pasta_modelagem = dir_escrita_model
         resultados_modelagem = {}
 

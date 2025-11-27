@@ -12,38 +12,26 @@ def extrair_outputs_fasta(df_output, outputs_de_interesse, metodo_escolhido, dir
     'Funcao1_Filtrar' e salva os domínios separados em 'Funcao2a_Separar'.
     """
     try:
-        # Verifica se as variáveis de estado (da memória) são válidas
         if df_output is None or df_output.empty:
             print("\n[ERRO] Os dados de filtragem (df_output) estão vazios.")
-            print("Isso pode acontecer se a etapa de filtragem não gerou resultados.")
-            print("A execução da 'Função 1b' foi interrompida.")
             return
 
         print("\nLendo arquivo FASTA das proteínas filtradas...")
         
-        # Constrói o caminho para o arquivo FASTA que a Função 1a deveria ter criado
         arquivo_fasta_filtrado = os.path.join(dir_leitura_fasta, f"proteinas_filtradas_{metodo_escolhido}.fasta")
         
-        # Verifica se o arquivo FASTA filtrado realmente existe no disco
         if not os.path.exists(arquivo_fasta_filtrado):
-            print(f"\n[ERRO] Arquivo FASTA filtrado não encontrado:")
-            print(f"Caminho esperado: {arquivo_fasta_filtrado}")
-            print("A 'Função 1a' pode ter falhado ao gerar este arquivo.")
+            print(f"\n[ERRO] Arquivo FASTA filtrado não encontrado: {arquivo_fasta_filtrado}")
             return
         
-        # Se o arquivo existe, continua o processo
         seq_dict = {record.id: record for record in SeqIO.parse(arquivo_fasta_filtrado, "fasta")}
 
         for dominio in outputs_de_interesse:
-            # --- LIMPEZA DE NOME DO ARQUIVO ---
-            # Remove vírgulas e troca espaços por underscore
+            # Remove espaços e vírgulas para nomear o arquivo
             output_name = dominio.replace(" ", "_").replace(",", "")
-            # ----------------------------------
-
-            # Salva o FASTA do domínio na pasta da Função 1b
+            
             arquivo_fasta_output = os.path.join(dir_escrita_dominios, f"{output_name}_{metodo_escolhido}.fasta")
             
-            # O parâmetro é 'case=False'
             df_dominio = df_output[df_output[config.coluna_output].str.contains(dominio, case=False, na=False)]
 
             if df_dominio.empty:
@@ -63,7 +51,6 @@ def extrair_outputs_fasta(df_output, outputs_de_interesse, metodo_escolhido, dir
                     seq_completa = seq_dict[prot_id].seq
                     sub_seq = seq_completa[start - 1:end]
                     
-                    # Cria um header único: >ID_DominioLimpo_Inicio_Fim
                     header = f">{prot_id}_{output_name}_{start}_{end}"
                     fasta_out.write(f"{header}\n{sub_seq}\n")
 

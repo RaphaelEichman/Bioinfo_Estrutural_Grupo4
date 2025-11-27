@@ -1,6 +1,7 @@
 """
 Módulo para a Função 5: Extrair códigos PDB, salvar scores do BLAST 
 e baixar os arquivos .pdb, agrupados por proteína (query).
+(Versão Otimizada: Downloads paralelos com 10 threads)
 """
 
 import os
@@ -8,11 +9,40 @@ import pandas as pd
 import requests 
 import time     
 import json 
+import concurrent.futures
 
-# --- FUNÇÃO AUXILIAR: Baixar PDBs ---
+def _download_worker(code, pasta_saida_especifica):
+    """
+    Função auxiliar executada por cada thread para baixar um arquivo.
+    """
+    code = code.strip().upper()
+    if not code:
+        return
+
+    url = f"https://files.rcsb.org/download/{code}.pdb"
+    caminho_pdb_out = os.path.join(pasta_saida_especifica, f"{code}.pdb")
+
+    if os.path.exists(caminho_pdb_out):
+        print(f"    -> {code}.pdb já existe. Pulando.")
+        return
+
+    try:
+        r = requests.get(url, timeout=15)
+        r.raise_for_status() 
+        
+        with open(caminho_pdb_out, 'w') as f_pdb:
+            f_pdb.write(r.text)
+        print(f"    -> {code}.pdb baixado com sucesso.")
+
+    except requests.exceptions.RequestException as e:
+        print(f"    -> Falha ao baixar {code}.pdb (Erro: {e})")
+    except Exception as e:
+        print(f"    -> Erro desconhecido em {code}: {e}")
+
 def baixar_pdb_files(codigos_pdb_set, pasta_saida_especifica):
     """
-    Baixa uma lista/set de códigos PDB para uma pasta de saída específica.
+    Baixa uma lista/set de códigos PDB para uma pasta de saída específica
+    usando até 10 threads simultâneas.
     """
     try:
         os.makedirs(pasta_saida_especifica, exist_ok=True)
@@ -21,39 +51,27 @@ def baixar_pdb_files(codigos_pdb_set, pasta_saida_especifica):
             print("  -> Nenhum código PDB para baixar neste grupo.")
             return
 
-        print(f"  -> Baixando {len(codigos_pdb_set)} PDBs para '{os.path.basename(pasta_saida_especifica)}'...")
+        lista_codigos = sorted(list(codigos_pdb_set))
+        total = len(lista_codigos)
+        print(f"  -> Iniciando download de {total} PDBs em '{os.path.basename(pasta_saida_especifica)}' (10 threads)...")
         
-        for code in sorted(list(codigos_pdb_set)):
-            code = code.strip().upper()
-            if not code:
-                continue
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_code = {
+                executor.submit(_download_worker, code, pasta_saida_especifica): code 
+                for code in lista_codigos
+            }
             
-            url = f"https://files.rcsb.org/download/{code}.pdb"
-            caminho_pdb_out = os.path.join(pasta_saida_especifica, f"{code}.pdb")
+            for future in concurrent.futures.as_completed(future_to_code):
+                try:
+                    future.result()
+                except Exception as exc:
+                    print(f"    -> Uma thread falhou: {exc}")
 
-            if os.path.exists(caminho_pdb_out):
-                print(f"    -> {code}.pdb já existe. Pulando.")
-                continue
-
-            try:
-                r = requests.get(url, timeout=10)
-                r.raise_for_status() 
-                
-                with open(caminho_pdb_out, 'w') as f_pdb:
-                    f_pdb.write(r.text)
-                print(f"    -> {code}.pdb baixado com sucesso.")
-
-                time.sleep(0.5) 
-
-            except requests.exceptions.RequestException as e:
-                print(f"    -> Falha ao baixar {code}.pdb (Erro: {e})")
-
-        print("  -> Download de PDBs para este grupo concluído.")
+        print("  -> Todos os downloads para este grupo foram processados.")
 
     except Exception as e:
-        print(f"  -> Erro inesperado durante o download de PDBs: {e}")
+        print(f"  -> Erro inesperado no gerenciador de downloads: {e}")
 
-# --- FUNÇÃO PRINCIPAL ---
 def extrair_pdb_codes(dir_leitura_blast, dir_escrita_pdb):
     """
     Varre 'Funcao3_Blastp', agrupa hits por proteína (Coluna A),
@@ -93,7 +111,6 @@ def extrair_pdb_codes(dir_leitura_blast, dir_escrita_pdb):
                 print(f"  -> Aviso: Arquivo {arquivo_base} não contém dados. Pulando.")
                 continue 
 
-            # Colunas: 0=Query, 1=Hit, 2=P-ident, 4=E-value, 5=Bitscore
             if 5 not in df.columns:
                 print(f"  -> Aviso: Arquivo {arquivo_base} não parece ter 6+ colunas. Pulando.")
                 continue
@@ -123,7 +140,6 @@ def extrair_pdb_codes(dir_leitura_blast, dir_escrita_pdb):
                     hit_string = str(row[1])
                     parts = hit_string.split('|')
                     
-                    # Formato esperado: pdb|CODIGO|CADEIA
                     if len(parts) >= 3 and parts[0] == 'pdb': 
                         pdb_code = parts[1]
                         chain = parts[2]
