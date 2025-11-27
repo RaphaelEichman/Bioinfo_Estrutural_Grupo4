@@ -1,4 +1,3 @@
-# pipeline_utils/align_utils.py
 """
 Módulo para a Função 3: Alinhar domínios usando Clustal Omega (EBI).
 """
@@ -11,9 +10,9 @@ from io import StringIO
 
 def alinhar_dominios_clustalo_online(dir_leitura_fasta, dir_escrita_align):
     """
-    Lê arquivos FASTA de 'dir_leitura_fasta' e salva os
+    Lê arquivos FASTA de 'Funcao1_Filtrar' ou 'Funcao2a_Separar' e salva os
     alinhamentos e árvores filogenéticas em subpastas
-    dentro de 'dir_escrita_align'.
+    dentro de 'Funcao4_AlinhamentoMultiplo'.
     """
     try:
         fasta_files = [f for f in os.listdir(dir_leitura_fasta) if f.endswith(".fasta")]
@@ -84,25 +83,18 @@ def alinhar_dominios_clustalo_online(dir_leitura_fasta, dir_escrita_align):
                 print("Erro no job. Pulando arquivo.")
                 continue
 
-            # --- BLOCO MODIFICADO ---
-            
-            # 1. Obter o nome base para a nova pasta
-            # Ex: "Diguanylate_cyclase"
+            # Organização de Pastas
             nome_base = os.path.splitext(arquivo_fasta)[0]
-
-            # 2. Criar a pasta de saída específica
-            # Ex: .../Funcao3_AlinhamentoMultiplo/Diguanylate_cyclase/
             pasta_saida_especifica = os.path.join(dir_escrita_align, nome_base)
             os.makedirs(pasta_saida_especifica, exist_ok=True)
             print(f"Salvando resultados em: {pasta_saida_especifica}")
 
-            # 3. Baixar alinhamento
+            # Baixar e Salvar Alinhamento
             url_result = f"https://www.ebi.ac.uk/Tools/services/rest/clustalo/result/{job_id}/aln-clustal"
             result_resp = requests.get(url_result)
             result_resp.raise_for_status()
             aln_text = result_resp.text
 
-            # 4. Salvar alinhamento NA SUBPASTA
             arquivo_alinhado = os.path.join(pasta_saida_especifica, f"{nome_base}_clustalo_alinhamento.clustal")
             with open(arquivo_alinhado, 'w') as f:
                 f.write(aln_text)
@@ -111,20 +103,17 @@ def alinhar_dominios_clustalo_online(dir_leitura_fasta, dir_escrita_align):
             alignment = AlignIO.read(StringIO(aln_text), "clustal")
             print(f"✓ {len(alignment)} sequências alinhadas ({alignment.get_alignment_length()} posições)")
 
-            # 5. Baixar Árvore (Automático)
+            # Baixar e Salvar Árvore
             print("Baixando Phylogenetic Tree...")
             url_tree = f"https://www.ebi.ac.uk/Tools/services/rest/clustalo/result/{job_id}/tree"
             r = requests.get(url_tree)
             r.raise_for_status()
             
-            # 6. Salvar árvore NA SUBPASTA
             arquivo_tree = os.path.join(pasta_saida_especifica, f"{nome_base}_tree.nwk")
             with open(arquivo_tree, 'w') as f:
                 f.write(r.text)
             print(f"Árvore salva em: {arquivo_tree}")
             
-            # --- FIM DO BLOCO MODIFICADO ---
-
             resultados[arquivo_fasta] = alignment
 
         print("\nTodos os alinhamentos concluídos com sucesso!")

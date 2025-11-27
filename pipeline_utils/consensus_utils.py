@@ -22,8 +22,7 @@ residue_classes = {
 }
 
 # ---------------------------------------------------------------
-# Função para processar um único arquivo (lógica interna)
-# (Sem alterações - esta função já salva onde é mandada)
+# Função para processar um único arquivo
 # ---------------------------------------------------------------
 def gerar_consenso_e_relatorio(arquivo_alinhamento, formato="clustal", limite_gaps=0.7, pasta_saida="consensus_results"):
     """
@@ -81,10 +80,14 @@ def gerar_consenso_e_relatorio(arquivo_alinhamento, formato="clustal", limite_ga
     fasta_saida = os.path.join(pasta_saida, f"{nome_base}_consensus.fasta")
     relatorio_saida = os.path.join(pasta_saida, f"{nome_base}_report.tsv")
     
+    # --- CORREÇÃO DE PADRONIZAÇÃO AQUI ---
+    # Antes: f.write(f">Consensus_{nome_base}\n")
+    # Agora: Mantemos coerência com o nome do arquivo
     with open(fasta_saida, "w") as f:
-        f.write(f">Consensus_{nome_base}\n")
+        f.write(f">{nome_base}_consensus\n")
         for i in range(0, len(consenso_seq), 60):
             f.write(consenso_seq[i:i+60] + "\n")
+    # -------------------------------------
     
     with open(relatorio_saida, "w") as f:
         f.write("Posição\tResíduo_Consenso\tFrequência_Consenso(%)\tNº_Sequências\tClasse_Residuo\tAlerta\n")
@@ -96,43 +99,31 @@ def gerar_consenso_e_relatorio(arquivo_alinhamento, formato="clustal", limite_ga
     return f"{nome_base}_consensus", consenso_seq
 
 # ---------------------------------------------------------------
-# Função principal (MODIFICADA)
+# Função principal
 # ---------------------------------------------------------------
 def gerar_consensos_para_diretorio(dir_leitura_align, dir_escrita_consensus, limite_gaps=0.7):
     """
-    Busca (recursivamente) por arquivos de alinhamento em 'dir_leitura_align',
+    Busca (recursivamente) por arquivos de alinhamento em 'Funcao4_AlinhamentoMultiplo',
     gera consenso e salva os resultados em subpastas espelhadas
-    dentro de 'dir_escrita_consensus'.
+    dentro de 'Funcao5_Consensus'.
     """
-    # Esta é a pasta RAIZ (Funcao4_Consensus)
     pasta_saida_raiz = dir_escrita_consensus 
-
-    # --- LÓGICA DE BUSCA MODIFICADA ---
-    # Lista para guardar tuplas: (caminho_completo_input, pasta_saida_especifica_output)
     arquivos_a_processar = [] 
     
     print(f"Buscando arquivos de alinhamento em: {dir_leitura_align}...")
     
-    # os.walk() irá percorrer o dir_leitura_align e todas as suas subpastas
     for root, dirs, files in os.walk(dir_leitura_align):
         
-        # Encontra o caminho relativo da subpasta
-        # Ex: "Diguanylate_cyclase" ou "." (se estiver na raiz de F3)
         rel_path = os.path.relpath(root, dir_leitura_align)
         
-        # Define a pasta de saída espelhada
-        # Ex: ".../Funcao4_Consensus/Diguanylate_cyclase"
         if rel_path == ".":
             pasta_saida_especifica = pasta_saida_raiz
         else:
             pasta_saida_especifica = os.path.join(pasta_saida_raiz, rel_path)
 
-        # Encontra os arquivos de alinhamento dentro desta subpasta
         for file in files:
             if file.endswith((".clustal", ".aln", ".fasta")):
                 caminho_completo_input = os.path.join(root, file)
-                
-                # Armazena o par de (input, output)
                 arquivos_a_processar.append((caminho_completo_input, pasta_saida_especifica))
     
     if not arquivos_a_processar:
@@ -144,10 +135,8 @@ def gerar_consensos_para_diretorio(dir_leitura_align, dir_escrita_consensus, lim
 
     todas_consensos = [] 
 
-    # Itera sobre a lista de pares (input, output)
     for caminho_completo, pasta_saida_especifica in arquivos_a_processar:
         
-        # Garante que a subpasta de saída (ex: .../F4/Diguanylate_cyclase) exista
         os.makedirs(pasta_saida_especifica, exist_ok=True) 
         
         arquivo_base = os.path.basename(caminho_completo)
@@ -155,8 +144,6 @@ def gerar_consensos_para_diretorio(dir_leitura_align, dir_escrita_consensus, lim
         
         print(f"Processando: {arquivo_base}")
         try:
-            # Passa o caminho completo do arquivo
-            # E a pasta de SAÍDA específica (a subpasta)
             nome_base, consenso_seq = gerar_consenso_e_relatorio(
                 caminho_completo, 
                 formato=formato, 
@@ -167,13 +154,12 @@ def gerar_consensos_para_diretorio(dir_leitura_align, dir_escrita_consensus, lim
         except Exception as e:
             print(f"Erro ao processar {arquivo_base}: {e}")
 
-    # --- Salva o arquivo 'todas_consensus.fasta' na pasta RAIZ ---
+    # --- Salva o arquivo 'todas_consensus.fasta' ---
     if todas_consensos:
-        # 'pasta_saida_raiz' é a 'Funcao4_Consensus'
         fasta_geral = os.path.join(pasta_saida_raiz, "todas_consensus.fasta")
         with open(fasta_geral, "w") as f:
             for nome_base, seq in todas_consensos:
-                f.write(f">Consensus_{nome_base}\n") 
+                f.write(f">{nome_base}_consensus\n") 
                 for i in range(0, len(seq), 60):
                     f.write(seq[i:i+60] + "\n")
         print(f"\n Arquivo geral criado: {fasta_geral}")

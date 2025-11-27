@@ -1,4 +1,3 @@
-# pipeline_utils/filter_utils.py
 """
 Módulo para a Função 1a: Filtrar por domínios e método.
 """
@@ -6,13 +5,12 @@ Módulo para a Função 1a: Filtrar por domínios e método.
 import os
 import pandas as pd
 from Bio import SeqIO
-import config # Ainda precisa do config para os NÚMEROS das colunas
+import config 
 
-# A assinatura da função foi simplificada, removendo 'skip_file_writing'
 def filtrar_por_dominios_e_metodo(caminho_tsv, caminho_fasta, output_dir):
     """
     Filtra o TSV do InterPro e o FASTA de entrada.
-    Salva os resultados em 'output_dir'.
+    Salva os resultados em 'Funcao1_Filtrar'.
     """
     try:
         df = pd.read_csv(caminho_tsv, sep='\t', header=None)
@@ -81,7 +79,6 @@ def filtrar_por_dominios_e_metodo(caminho_tsv, caminho_fasta, output_dir):
                 if all(d in outputs_encontrados for d in outputs_de_interesse):
                     proteinas_todos_dominios.append(proteina_id)
 
-        # A lógica de escrita de arquivos agora é executada sempre
         tsv_saida = os.path.join(output_dir, f"sumario_{metodo_escolhido}.tsv")
         df_final = pd.DataFrame(resultados_sumarizados)
         df_final.to_csv(tsv_saida, sep='\t', index=False)
@@ -108,7 +105,6 @@ def filtrar_por_dominios_e_metodo(caminho_tsv, caminho_fasta, output_dir):
                     SeqIO.write(seq_dict[prot_id], out_fasta, "fasta")
         print(f"FASTA das proteínas filtradas salvo em: '{arquivo_fasta_filtrado}'")
 
-        # Retorna as variáveis para a Função 1b (extract)
         return df_output, outputs_de_interesse, metodo_escolhido
 
     except FileNotFoundError:

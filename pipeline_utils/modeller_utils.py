@@ -1,7 +1,7 @@
 # pipeline_utils/modeller_utils.py
 """
 Módulo para a Função 7 (Modeller): Rodar o MODELLER.
-(Versão Interativa: Seleção Automática via IDENTIDADE, Manual com Resolução)
+(Versão Atualizada: Busca robusta por arquivos em F5/F2 ignorando sufixos)
 """
 
 import os
@@ -22,57 +22,84 @@ try:
 except ImportError:
     print("\n[ERRO] Modeller não encontrado. Verifique se está instalado e no seu PYTHONPATH.")
     
-# Importa sys para usar float_info.max
 import sys 
 
-# -----------------------------------------------------------------
-# CLASSE PERSONALIZADA DO AUTOMODEL
-# -----------------------------------------------------------------
+# --- CLASSE PERSONALIZADA DO AUTOMODEL ---
 class MyAutoModel(AutoModel):
     def user_after_single_model(self):
-        # Acessa o terminal original para dar um feedback limpo ao usuário
         sys.__stdout__.write(f"    -> Modelo gerado com sucesso.\n")
         sys.__stdout__.flush()
 
-# -----------------------------------------------------------------
-# FUNÇÃO HELPER: Encontrar a sequência alvo
-# -----------------------------------------------------------------
-def find_target_sequence(query_key, dir_f2b, dir_f2a):
-    """Encontra um SeqRecord com um ID correspondente ao 'query_key'."""
+# --- HELPER: Encontrar a sequência alvo (Busca Inteligente) ---
+def find_target_sequence(query_key, dir_f2b, dir_f2a, dir_f5=None):
+    """
+    Encontra um SeqRecord correspondente ao 'query_key'.
+    Tenta casar o nome exato OU verifica se o query_key é parte do nome do arquivo.
+    """
     
-    # 1. Busca em Funcao2b_FastasIndividuais
-    for root, dirs, files in os.walk(dir_f2b):
-        for file in files:
-            caminho_fasta = os.path.join(root, file)
-            file_name_without_ext = os.path.splitext(file)[0]
+    # 1. Busca em Funcao5_Consensus (Prioridade para Consenso)
+    if dir_f5 and os.path.exists(dir_f5):
+        # Tenta achar uma PASTA que contenha o nome (Blast cria pastas com nome base)
+        # Ex: query_key = "Diguanylate_cyclase"
+        # Pasta pode ser: "Diguanylate_cyclase,_GGDEF_domain_Pfam"
+        
+        # Estratégia A: Busca Exata ou Parcial na estrutura de pastas
+        pastas_candidatas = []
+        for root, dirs, files in os.walk(dir_f5):
+            # Se a pasta atual é a raiz F5, olhamos as subpastas
+            if root == dir_f5:
+                for d in dirs:
+                    if query_key in d: # Se o nome do blast está contido no nome da pasta consenso
+                        pastas_candidatas.append(os.path.join(root, d))
+            
+            # Estratégia B: Busca por ARQUIVOS FASTA
+            for file in files:
+                if file.endswith(".fasta"):
+                    # Verifica se query_key está dentro do nome do arquivo
+                    # Ex: query_key "Diguanylate" está em "Diguanylate_..._consensus.fasta"
+                    if query_key in file:
+                        try:
+                            return SeqIO.read(os.path.join(root, file), "fasta")
+                        except Exception: 
+                            # Se não der pra ler direto, tenta parse
+                            try:
+                                for record in SeqIO.parse(os.path.join(root, file), "fasta"):
+                                    return record
+                            except: pass
 
-            if file_name_without_ext.startswith(query_key) and file.endswith(".fasta"):
+        # Se achou pastas candidatas na Estratégia A, pega o primeiro fasta de lá
+        for pasta in pastas_candidatas:
+            arquivos = [f for f in os.listdir(pasta) if f.endswith(".fasta")]
+            if arquivos:
                 try:
-                    record = SeqIO.read(caminho_fasta, "fasta")
-                    if record.id == query_key: return record
-                except ValueError:
+                    return SeqIO.read(os.path.join(pasta, arquivos[0]), "fasta")
+                except: pass
+
+    # 2. Busca em Funcao2b_FastasIndividuais
+    if dir_f2b and os.path.exists(dir_f2b):
+        for root, dirs, files in os.walk(dir_f2b):
+            for file in files:
+                if query_key in file and file.endswith(".fasta"):
                     try:
-                        for record in SeqIO.parse(caminho_fasta, "fasta"):
-                            if record.id == query_key: return record
+                        return SeqIO.read(os.path.join(root, file), "fasta")
                     except Exception: pass
-                except Exception: pass
 
-    # 2. Busca em Funcao2a_Separar (Domínios)
-    try:
-        for file in os.listdir(dir_f2a):
-            if file.endswith(".fasta"):
-                caminho_fasta = os.path.join(dir_f2a, file)
-                try:
-                    for record in SeqIO.parse(caminho_fasta, "fasta"):
-                        if record.id == query_key: return record
-                except Exception: pass
-    except Exception: pass
+    # 3. Busca em Funcao2a_Separar
+    if dir_f2a and os.path.exists(dir_f2a):
+        try:
+            for file in os.listdir(dir_f2a):
+                if query_key in file and file.endswith(".fasta"):
+                    try:
+                        for record in SeqIO.parse(os.path.join(dir_f2a, file), "fasta"):
+                            if query_key in record.id: return record
+                            # Se não bater ID, retorna o primeiro (assumindo ser o certo pelo nome do arquivo)
+                            return record
+                    except Exception: pass
+        except Exception: pass
 
     return None
 
-# -----------------------------------------------------------------
-# FUNÇÃO HELPER: Escrever o arquivo .ali
-# -----------------------------------------------------------------
+# --- HELPER: Escrever o arquivo .ali ---
 def write_sequence_to_ali(seq_record, ali_file_path, target_code="MtDH"):
     try:
         with open(ali_file_path, 'w') as f:
@@ -85,14 +112,8 @@ def write_sequence_to_ali(seq_record, ali_file_path, target_code="MtDH"):
         print(f"[ERRO] Falha ao criar arquivo .ali: {e}")
         return False
 
-# -----------------------------------------------------------------
-# FUNÇÃO HELPER: Extrair Resolução do PDB
-# -----------------------------------------------------------------
+# --- HELPER: Extrair Resolução do PDB ---
 def get_pdb_resolution(pdb_path):
-    """
-    Lê o arquivo PDB e tenta extrair a resolução (REMARK 2).
-    Retorna uma string (ex: '1.50' ou 'N/A').
-    """
     try:
         with open(pdb_path, 'r') as f:
             for line in f:
@@ -106,16 +127,10 @@ def get_pdb_resolution(pdb_path):
                     break
     except Exception:
         return "Erro"
-    
     return "N/A" 
 
-# -----------------------------------------------------------------
-# NOVO HELPER: Seleção Interativa de Molde
-# -----------------------------------------------------------------
+# --- HELPER: Seleção Interativa de Molde ---
 def selecionar_molde_interativo(run_dir):
-    """
-    Lê o JSON, verifica PDBs, extrai resolução e pede seleção.
-    """
     json_path = os.path.join(run_dir, "blast_hits.json")
     pasta_moldes = os.path.join(run_dir, "Moldes")
 
@@ -131,9 +146,7 @@ def selecionar_molde_interativo(run_dir):
     for pdb_code, data in hits_data.items():
         pdb_full_path = os.path.join(pasta_moldes, f"{pdb_code}.pdb")
         if os.path.exists(pdb_full_path):
-            
             resolution = get_pdb_resolution(pdb_full_path)
-            
             available_hits.append({
                 'code': pdb_code,
                 'chain': data['chain'],
@@ -147,7 +160,6 @@ def selecionar_molde_interativo(run_dir):
         print("  [ERRO] Nenhum arquivo PDB válido encontrado na pasta Moldes.")
         return None, None
 
-    # Prioridade: 1. Identidade (maior), 2. E-value (menor), 3. Bitscore (maior)
     available_hits.sort(key=lambda x: (-x['pident'], x['evalue'], -x['bitscore']))
 
     print(f"\n  --- Seleção de Molde para esta Proteína ---")
@@ -158,33 +170,20 @@ def selecionar_molde_interativo(run_dir):
     
     while True:
         modo = input("  Escolha [1 ou 2]: ").strip()
-        
         if modo == '1':
             melhor = available_hits[0]
-            # --- LINHA ALTERADA AQUI ---
             print(f"  -> Selecionado Automaticamente: {melhor['code']} (Cadeia {melhor['chain']}) | Identidade: {melhor['pident']}% | Resolução: {melhor['resolution']} Å")
-            # ---------------------------
             return melhor['code'], melhor['chain']
-        
         elif modo == '2':
             print("\n  {:<5} {:<8} {:<8} {:<10} {:<12} {:<12} {:<12}".format(
                 "ID", "PDB", "Cadeia", "Res.(Å)", "Ident.(%)", "Bitscore", "E-value"))
             print("  " + "-"*80)
-            
             for i, hit in enumerate(available_hits, start=1):
                 res_str = hit['resolution'] if hit['resolution'] else "N/A"
                 print("  {:<5} {:<8} {:<8} {:<10} {:<12.2f} {:<12.1f} {:<12}".format(
-                    f"[{i}]", 
-                    hit['code'], 
-                    hit['chain'], 
-                    res_str, 
-                    hit['pident'], 
-                    hit['bitscore'], 
-                    hit['evalue']
+                    f"[{i}]", hit['code'], hit['chain'], res_str, hit['pident'], hit['bitscore'], hit['evalue']
                 ))
-            
             print("  " + "-"*80)
-            
             while True:
                 sel = input(f"  Digite o número do molde (1-{len(available_hits)}): ").strip()
                 try:
@@ -201,49 +200,33 @@ def selecionar_molde_interativo(run_dir):
             print("  Opção inválida. Digite 1 ou 2.")
 
 
-# -----------------------------------------------------------------
-# FUNÇÃO CORE DO MODELLER 
-# -----------------------------------------------------------------
+# --- FUNÇÃO CORE DO MODELLER ---
 def _execute_modeller_core(run_dir, selected_code, selected_chain):
-    """
-    Executa a lógica interna do Modeller usando o molde JÁ SELECIONADO.
-    """
     print(f"\n--- Iniciando Core do Modeller com {selected_code}:{selected_chain} ---")
-    
     try:
         output_dir = "output" 
         os.makedirs(output_dir, exist_ok=True)
         os.chdir(output_dir)
 
-        # Definição de variáveis locais para o Modeller
         X = selected_code
         X_CHAIN = selected_chain
 
-        # --- ALINHAMENTO ---
         env_align = Environ()
         env_align.io.atom_files_directory = ['.', '../Moldes'] 
-        
         aln_align = Alignment(env_align)
         
-        # Carrega o molde selecionado
         mdl = Model(env_align, file=X, model_segment=('FIRST:'+X_CHAIN,'LAST:'+X_CHAIN))
         aln_align.append_model(mdl, align_codes=X+X_CHAIN, atom_files=X+'.pdb')
         
-        # Carrega o alvo
         aln_align.append(file='../MtDH.ali', align_codes='MtDH') 
-        
-        # Alinha
         aln_align.align2d() 
         
-        # Escreve arquivos de alinhamento
         aln_align.write(file=f'MtDH-{X}.ali', alignment_format='PIR')
         aln_align.write(file=f'MtDH-{X}.pap', alignment_format='PAP')
 
-        # --- MODELAGEM ---
         env_model = Environ()
         env_model.io.atom_files_directory = ['.', '../Moldes'] 
         
-        # Usamos MyAutoModel para feedback limpo no terminal
         a = MyAutoModel(env_model, alnfile=f'MtDH-{X}.ali',
                       knowns=X+X_CHAIN,
                       sequence='MtDH',
@@ -252,7 +235,6 @@ def _execute_modeller_core(run_dir, selected_code, selected_chain):
         a.starting_model = 1
         a.ending_model = config.modeller_ending_model
         
-        # Roda a modelagem
         a.make()
         
         return a.outputs
@@ -262,16 +244,16 @@ def _execute_modeller_core(run_dir, selected_code, selected_chain):
         raise e
 
 
-# -----------------------------------------------------------------
-# FUNÇÃO PRINCIPAL (ORQUESTRADOR)
-# -----------------------------------------------------------------
-def run_modelling(dir_f2a, dir_f2b, dir_f6, dir_f7):
+# --- FUNÇÃO PRINCIPAL (ORQUESTRADOR) ---
+def run_modelling(dir_f2a, dir_f2b, dir_f5, dir_f6, dir_f7):
     """
     Orquestra o processo de modelagem.
+    Inputs: 'Funcao2a_Separar', 'Funcao2b_FastasIndividuais', 'Funcao5_Consensus', 'Funcao6_PDB'.
+    Output: 'Funcao7_Modeller'.
     """
     print("\n--- Iniciando Função 7: MODELLER ---")
     
-    # --- 1. Selecionar Fonte (F6) ---
+    # 1. Selecionar Fonte (F6)
     try:
         pastas_base = [d for d in os.listdir(dir_f6) if os.path.isdir(os.path.join(dir_f6, d))]
     except Exception as e:
@@ -327,7 +309,6 @@ def run_modelling(dir_f2a, dir_f2b, dir_f6, dir_f7):
                 for query_key in pastas_query_nomes:
                     template_source_path = os.path.join(dir_base_selecionada, query_key)
                     query_jobs_to_run.append((query_key, template_source_path, nome_pasta_base))
-                
             elif 1 <= int(escolha_query) <= len(pastas_query_nomes):
                 query_key = pastas_query_nomes[int(escolha_query) - 1]
                 template_source_path = os.path.join(dir_base_selecionada, query_key)
@@ -351,11 +332,13 @@ def run_modelling(dir_f2a, dir_f2b, dir_f6, dir_f7):
         print(f"PROCESSANDO: {query_key}")
         print(f"==================================================")
         
-        # 2. Encontrar Alvo
-        target_seq_record = find_target_sequence(query_key, dir_f2b, dir_f2a)
+        # 2. Encontrar Alvo (AGORA INCLUI F5 com busca inteligente)
+        target_seq_record = find_target_sequence(query_key, dir_f2b, dir_f2a, dir_f5)
         if target_seq_record is None:
-            print(f"[ERRO] Alvo não encontrado em F2b ou F2a. Pulando.")
+            print(f"[ERRO] Alvo não encontrado em F2b, F5 ou F2a para '{query_key}'. Pulando.")
             continue
+        
+        print(f"  -> Alvo encontrado: {target_seq_record.id}")
 
         # 3. Preparar Estrutura de Pastas
         f7_run_base_dir = os.path.join(dir_f7, nome_pasta_base)
@@ -390,14 +373,14 @@ def run_modelling(dir_f2a, dir_f2b, dir_f6, dir_f7):
         if not write_sequence_to_ali(target_seq_record, ali_file_path, "MtDH"):
             continue
 
-        # --- 4. SELEÇÃO DE MOLDE (Interativa ou Auto) ---
+        # 4. Seleção de Molde
         selected_code, selected_chain = selecionar_molde_interativo(run_dir)
         
         if not selected_code:
             print("  [Abortado] Nenhum molde selecionado. Pulando esta proteína.")
             continue
 
-        # --- 5. EXECUÇÃO DO MODELLER (Silenciada) ---
+        # 5. Execução do MODELLER (Silenciada)
         log_file_path = os.path.join(run_dir, "saida.log")
         print(f"  Iniciando MODELLER... (Aguarde, log em: {os.path.basename(log_file_path)})")
         
@@ -405,7 +388,6 @@ def run_modelling(dir_f2a, dir_f2b, dir_f6, dir_f7):
         
         try:
             with open(log_file_path, 'w') as log_file:
-                # Redireciona TUDO para o arquivo
                 with contextlib.redirect_stdout(log_file), contextlib.redirect_stderr(log_file):
                     os.chdir(run_dir)
                     modeller_outputs = _execute_modeller_core(run_dir, selected_code, selected_chain)
@@ -415,14 +397,14 @@ def run_modelling(dir_f2a, dir_f2b, dir_f6, dir_f7):
             os.chdir(original_cwd) 
             continue
         
-        # --- 6. PÓS-PROCESSAMENTO (Pasta Selecionados) ---
+        # 6. Pós-Processamento
         os.chdir(run_dir) 
         
         print("\n  --- Processando Melhores Resultados ---")
         dir_selecionados = os.path.join(run_dir, "Selecionados")
         os.makedirs(dir_selecionados, exist_ok=True)
         
-        # A. Copiar Molde Selecionado
+        # Copiar Molde Selecionado
         caminho_molde_origem = os.path.join("Moldes", f"{selected_code}.pdb")
         caminho_molde_destino = os.path.join(dir_selecionados, f"Molde_{selected_code}.pdb")
         
@@ -432,12 +414,11 @@ def run_modelling(dir_f2a, dir_f2b, dir_f6, dir_f7):
         else:
             print(f"  -> [Aviso] Molde {selected_code}.pdb não encontrado para cópia.")
 
-        # B. Copiar Melhor Modelo (Menor DOPE)
+        # Copiar Melhor Modelo
         try:
             output_folder = "output"
             if modeller_outputs:
                 sucessos = [m for m in modeller_outputs if m.get('failure') is None]
-                
                 if sucessos:
                     melhor_modelo_data = min(sucessos, key=lambda x: x.get('DOPE score', 999999))
                     nome_arquivo_modelo = melhor_modelo_data['name'] 
@@ -456,7 +437,6 @@ def run_modelling(dir_f2a, dir_f2b, dir_f6, dir_f7):
                     print("  -> Nenhum modelo gerado com sucesso.")
             else:
                 print("  -> Lista de outputs do Modeller vazia.")
-                
         except Exception as e:
             print(f"  -> Erro ao copiar melhores resultados: {e}")
 

@@ -1,4 +1,3 @@
-# pipeline_utils/pdb_utils.py
 """
 Módulo para a Função 5: Extrair códigos PDB, salvar scores do BLAST 
 e baixar os arquivos .pdb, agrupados por proteína (query).
@@ -10,10 +9,7 @@ import requests
 import time     
 import json 
 
-# -----------------------------------------------------------------
-# FUNÇÃO AUXILIAR: Baixar PDBs
-# (Sem alterações)
-# -----------------------------------------------------------------
+# --- FUNÇÃO AUXILIAR: Baixar PDBs ---
 def baixar_pdb_files(codigos_pdb_set, pasta_saida_especifica):
     """
     Baixa uma lista/set de códigos PDB para uma pasta de saída específica.
@@ -57,13 +53,12 @@ def baixar_pdb_files(codigos_pdb_set, pasta_saida_especifica):
     except Exception as e:
         print(f"  -> Erro inesperado durante o download de PDBs: {e}")
 
-# -----------------------------------------------------------------
-# FUNÇÃO PRINCIPAL (MODIFICADA)
-# -----------------------------------------------------------------
+# --- FUNÇÃO PRINCIPAL ---
 def extrair_pdb_codes(dir_leitura_blast, dir_escrita_pdb):
     """
-    Varre 'dir_leitura_blast', agrupa hits por proteína (Coluna A),
-    salva um 'blast_hits.json' com os scores E A CADEIA, e baixa os PDBs.
+    Varre 'Funcao3_Blastp', agrupa hits por proteína (Coluna A),
+    salva um 'blast_hits.json' com os scores E A CADEIA, e baixa os PDBs
+    para 'Funcao6_PDB'.
     """
     
     arquivos_tsv_encontrados = []
@@ -128,21 +123,19 @@ def extrair_pdb_codes(dir_leitura_blast, dir_escrita_pdb):
                     hit_string = str(row[1])
                     parts = hit_string.split('|')
                     
-                    # --- LÓGICA DE EXTRAÇÃO ATUALIZADA ---
                     # Formato esperado: pdb|CODIGO|CADEIA
                     if len(parts) >= 3 and parts[0] == 'pdb': 
                         pdb_code = parts[1]
-                        chain = parts[2] # <-- Salva a cadeia
+                        chain = parts[2]
                         codigos_neste_grupo.add(pdb_code)
                         
                         if (pdb_code not in hits_data) or (row[4] < hits_data[pdb_code]["evalue"]):
                             hits_data[pdb_code] = {
-                                "chain": chain, # <-- Salva a cadeia no JSON
+                                "chain": chain,
                                 "evalue": row[4],
                                 "bitscore": row[5],
                                 "pident": row[2]
                             }
-                    # --- FIM DA LÓGICA ATUALIZADA ---
                 
                 if codigos_neste_grupo:
                     json_path = os.path.join(pasta_saida_proteina, 'blast_hits.json')

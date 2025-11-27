@@ -75,15 +75,11 @@ def main():
     print(f"Pasta de Resultados: {dir_results}")
 
     # --- 4. Detecção Automática de Inputs ---
-    # Procura qualquer .tsv
     input_tsv = encontrar_arquivo_input(dir_input, (".tsv"), "InterPro TSV")
-    
-    # Procura qualquer .fasta, .fa, .fna, .faa
-    input_fasta = encontrar_arquivo_input(dir_input, (".fasta", ".fa", ".fna", ".faa"), "Sequências FASTA")
+    input_fasta = encontrar_arquivo_input(dir_input, (".fasta"), "Sequências FASTA")
 
     while True:
         print("\nMENU PRINCIPAL--------------------------------------------------")
-        # Menu atualizado com Input/Output explícitos
         print("1. Filtrar e Extrair Domínios      (Input: input; Output: Funcao1, Funcao2a)")
         print("2. Preparar FASTAs Individuais     (Input: Funcao1, Funcao2a, input; Output: Funcao2b)")
         print("3. Rodar BLASTp                    (Input: Funcao1, Funcao2a, Funcao2b, Funcao5; Output: Funcao3)")
@@ -164,11 +160,13 @@ def main():
             target_dir = dir_f3
 
             if escolha_fonte in ['1', '2']:
+                # Modo Manual para pastas raiz (Pergunta 1 não existe, Pergunta 2 acontece)
                 source_dir = dir_f1 if escolha_fonte == '1' else dir_f2a
                 print(f"Lendo FASTAs de: {source_dir}")
-                blast_utils.rodar_blast(source_dir, target_dir)
+                blast_utils.rodar_blast(source_dir, target_dir, automatico=False)
 
             elif escolha_fonte == '3':
+                # Modo Automático para subpastas (Pergunta 1 acontece, Pergunta 2 suprimida)
                 print(f"\nAnalisando subpastas em '{dir_f2b}'...")
                 try:
                     subpastas = [d for d in os.listdir(dir_f2b) if os.path.isdir(os.path.join(dir_f2b, d))]
@@ -186,10 +184,11 @@ def main():
                         s_dir = os.path.join(dir_f2b, p)
                         t_dir = os.path.join(target_dir, p)
                         os.makedirs(t_dir, exist_ok=True)
-                        blast_utils.rodar_blast(s_dir, t_dir)
+                        blast_utils.rodar_blast(s_dir, t_dir, automatico=True)
                 except Exception as e: print(f"Erro: {e}")
 
             elif escolha_fonte == '4':
+                # Modo Automático para subpastas (Pergunta 1 acontece, Pergunta 2 suprimida)
                 print(f"\nAnalisando subpastas em '{dir_f5}'...")
                 try:
                     subpastas = [d for d in os.listdir(dir_f5) if os.path.isdir(os.path.join(dir_f5, d))]
@@ -205,9 +204,10 @@ def main():
                         pastas_proc.append(subpastas[int(escolha)-1])
                     for p in pastas_proc:
                         s_dir = os.path.join(dir_f5, p)
-                        t_dir = os.path.join(target_dir, f"Consenso_{p}")
+                        # Padronização: nome da pasta de saída = nome da pasta de entrada (sem prefixo Consenso_)
+                        t_dir = os.path.join(target_dir, p) 
                         os.makedirs(t_dir, exist_ok=True)
-                        blast_utils.rodar_blast(s_dir, t_dir)
+                        blast_utils.rodar_blast(s_dir, t_dir, automatico=True)
                 except Exception as e: print(f"Erro: {e}")
 
         # --- OPÇÃO 4: ALINHAMENTO ---
@@ -240,7 +240,8 @@ def main():
         # --- OPÇÃO 7: MODELLER ---
         elif opcao == '7':
             print(f"\n--- Iniciando Função 7: Rodar MODELLER ---")
-            modeller_utils.run_modelling(dir_f2a, dir_f2b, dir_f6, dir_f7)
+            # Adicionado dir_f5 na chamada para garantir a busca de consenso
+            modeller_utils.run_modelling(dir_f2a, dir_f2b, dir_f5, dir_f6, dir_f7)
             
         else:
             print("\n[!] Opção inválida. Digite um número entre 1 e 7.")

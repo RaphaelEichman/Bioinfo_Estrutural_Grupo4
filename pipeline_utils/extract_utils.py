@@ -1,4 +1,3 @@
-# pipeline_utils/extract_utils.py
 """
 Módulo para a Função 1b: Extrair sequências de todos os outputs.
 """
@@ -10,7 +9,7 @@ import config
 def extrair_outputs_fasta(df_output, outputs_de_interesse, metodo_escolhido, dir_leitura_fasta, dir_escrita_dominios):
     """
     Recebe os resultados da Função 1a, lê o FASTA filtrado de
-    'dir_leitura_fasta' e salva os domínios separados em 'dir_escrita_dominios'.
+    'Funcao1_Filtrar' e salva os domínios separados em 'Funcao2a_Separar'.
     """
     try:
         # Verifica se as variáveis de estado (da memória) são válidas
@@ -36,14 +35,16 @@ def extrair_outputs_fasta(df_output, outputs_de_interesse, metodo_escolhido, dir
         seq_dict = {record.id: record for record in SeqIO.parse(arquivo_fasta_filtrado, "fasta")}
 
         for dominio in outputs_de_interesse:
-            output_name = dominio.replace(" ", "_")
+            # --- LIMPEZA DE NOME DO ARQUIVO ---
+            # Remove vírgulas e troca espaços por underscore
+            output_name = dominio.replace(" ", "_").replace(",", "")
+            # ----------------------------------
+
             # Salva o FASTA do domínio na pasta da Função 1b
             arquivo_fasta_output = os.path.join(dir_escrita_dominios, f"{output_name}_{metodo_escolhido}.fasta")
             
-            # --- LINHA CORRIGIDA ---
-            # O parâmetro é 'case=False', e não 'case_False'
+            # O parâmetro é 'case=False'
             df_dominio = df_output[df_output[config.coluna_output].str.contains(dominio, case=False, na=False)]
-            # --- FIM DA CORREÇÃO ---
 
             if df_dominio.empty:
                 print(f"\nNenhuma ocorrência do output '{dominio}' encontrada nos dados.")
@@ -61,6 +62,8 @@ def extrair_outputs_fasta(df_output, outputs_de_interesse, metodo_escolhido, dir
 
                     seq_completa = seq_dict[prot_id].seq
                     sub_seq = seq_completa[start - 1:end]
+                    
+                    # Cria um header único: >ID_DominioLimpo_Inicio_Fim
                     header = f">{prot_id}_{output_name}_{start}_{end}"
                     fasta_out.write(f"{header}\n{sub_seq}\n")
 
